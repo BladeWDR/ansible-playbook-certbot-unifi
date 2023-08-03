@@ -1,0 +1,61 @@
+---
+- name: Unifi controller SSL certificate prep work.
+  hosts: all
+  become: true
+
+  vars:
+    FQDN: unifi.tcgrepairs.com
+
+  pre_tasks:
+
+    - name: Update package caches.
+      package:
+        update-cache: true
+
+
+  tasks:
+
+
+    - name: Install packages
+      package:
+        name: 
+          - certbot
+          - python3-certbot-apache  
+        state: present
+
+    - name: Check if the acme-dns-auth plugin has been downloaded already.
+      stat: 
+        path: /etc/letsencrypt/acme-dns-auth.py
+      register: downloaded
+      tags: test
+
+    - debug: var=downloaded
+      tags: test
+
+
+    - name: Download the acme-dns-auth plugin for Certbot.
+      get_url: 
+        url: https://github.com/joohoi/acme-dns-certbot-joohoi/raw/master/acme-dns-auth.py
+        dest: /etc/letsencrypt
+        mode: '0755'
+      when: downloaded.stat.exists == false 
+
+
+    - name: Change the python binary that acme-dns-auth uses.
+      lineinfile: 
+        path: /etc/letsencrypt/acme-dns-auth.py
+        regex: '^#!/usr/bin/env python'
+        line: '#!/usr/bin/env python3'
+
+    - name: Copy Steve Jenkin's script to the remote system.
+      copy: 
+        src: unifi_ssl_import.sh
+        dest: /usr/local/bin/unifi_ssl_import.sh
+        force: no
+        mode: '0755'
+
+    - name: Modify the script so that it uses the correct FQDN.
+      lineinfile:
+        path: /usr/local/bin/unifi_ssl_import.sh
+        regex: "^UNIFI_HOSTNAME="
+        line: "UNIFI_HOSTNAME={{ FQDN }}"

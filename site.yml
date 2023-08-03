@@ -1,0 +1,68 @@
+---
+- name: Configure Unifi controller with SSL certificate.
+  hosts: all
+  become: true
+
+  pre_tasks:
+    - name: Update package cache.
+      package:
+        update-cache: true
+
+  roles:
+  - geerlingguy.certbot
+
+  tasks: 
+
+    - name: Install Certbot Cloudflare.
+      package: 
+        name: python3-certbot-dns-cloudflare
+        state: present 
+
+
+    - name: Create Certbot folder - /etc/letsencrypt
+      file:
+        path: /etc/letsencrypt
+        state: directory
+        owner: root
+        group: root
+        mode: 0700
+
+    - name: Certbot Template
+      template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: root
+        group: root
+        mode: 0600
+      with_items:
+        - { src: 'dnscloudflare.ini.j2', dest: '/etc/letsencrypt/dnscloudflare.ini' }
+
+    - name: Certbot | Generate Certificate
+      command: certbot certonly --non-interactive --agree-tos --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/dnscloudflare.ini -m {{certbot_email}} -d {{inventory_hostname}}
+      args:
+        creates: /etc/letsencrypt/renewal/{{inventory_hostname}}.conf
+
+    - name: Copy Steve Jenkin's script to the remote system.
+      copy: 
+        src: unifi_ssl_import.sh
+        dest: /usr/local/bin/unifi_ssl_import.sh
+        force: no
+        mode: '0755'
+
+    - name: Modify the script so that it uses the correct FQDN.
+      lineinfile:
+        path: /usr/local/bin/unifi_ssl_import.sh
+        regex: "^UNIFI_HOSTNAME="
+        line: "UNIFI_HOSTNAME={{ inventory_hostname }}"
+
+
+    - name: Run Steve Jenkin's script.
+      command: /usr/local/bin/unifi_ssl_import.sh
+
+    - name: Create cron job to rerun the script when the cert is renewed.
+      copy:
+        src: cronjob
+        dest: /etc/cron.daily/unifi_ssl_import
+        owner: root 
+        group: root 
+        mode: '0755'

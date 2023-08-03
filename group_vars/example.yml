@@ -1,0 +1,4 @@
+certbot_auto_renew: true
+certbot_auto_renew_user: root
+certbot_email: "cloudflareemail@example.com"
+certbot_cloudflare_api_token: 'ur-cloudflare-token-go-here'

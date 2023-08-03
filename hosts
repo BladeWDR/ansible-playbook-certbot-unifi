@@ -1,0 +1,5 @@
+---
+all:
+    hosts:
+        unifi.example.com:
+
